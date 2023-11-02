@@ -2,10 +2,11 @@
 #
 # 
 # 08/21/2022 - CMGUI
-
+import sqlite3
+import glob
+import pandas as pd
 from datetime import datetime
 import zoneinfo
-#from zoneinfo import ZoneInfo
 from datetime import timezone
 from datetime import timedelta
 import json
@@ -15,6 +16,12 @@ import os
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
+
+class DateTimeEncoder(json.JSONEncoder):  
+    def default(self, o):  
+        if isinstance(o, datetime):  
+            return o.isoformat()  
+        return super().default(o)  
 
 def detect_daemon1(filename1):
 	# find out the daemon from the line Vendor daemon: ptc_d, Vendor daemon: SW_D
@@ -193,6 +200,7 @@ def detect_timezone_startdate1(filename1):
 	for line1 in lines1:
 		if line1.find('-SLOG@) Start-Date: ') != -1 or line1.find('-SLOG@) Time:') != -1:
 			tz1 = line1[line1.rfind(':')+3:].strip()
+			tz1 = 'China Standard Time'
 			if line1.find('-SLOG@) Start-Date:') != -1: 
 				currentdate1 = line1[ line1.find('-SLOG@) Start-Date:') + 23:]
 			elif line1.find('-SLOG@) Time:') != -1:
@@ -201,6 +209,7 @@ def detect_timezone_startdate1(filename1):
 				print("error at line 200: currentdate1.find(':') == -1")
 			else:
 				currentdate1 = currentdate1[:currentdate1.find(':')-3].strip()
+			#print("Start-Date:",currentdate1)
 			dt_obj = datetime.strptime(currentdate1 + ' 00:00:00', '%b %d %Y %H:%M:%S')
 			origin_tz = zoneinfo.ZoneInfo(timezone_win_iana_mapping1(tz1))
 			dt_obj = datetime( dt_obj.year, dt_obj.month, dt_obj.day, tzinfo=origin_tz)
@@ -208,25 +217,29 @@ def detect_timezone_startdate1(filename1):
 			break
 	return(False)
 
-# def get_filenames1():
-# 	currdir = os.getcwd()
-# 	root1 = tkinter.Tk()
-# 	root1.withdraw()
-# 	#file_path1 = filedialog.askopenfilename()
-# 	# note that tkinter.filedialog does not work. Need to have from tkinter import filedialog
-# 	root1.filename =  filedialog.askopenfilenames(initialdir = os.getcwd(),title = "Select a log file or multiple log files",filetypes = (("log files","*.log"),("all files","*.*")))
-# 	return(root1.filename)
+
+def get_filenamelist():
+	currdir = os.getcwd()
+	return glob.glob(os.path.join(currdir, '*.log'))
+
+
 
 def get_filename1():
 	# Prompts user to select a log file via Windows Explorer browser
 	currdir = os.getcwd()
 	root1 = tkinter.Tk()
 	root1.withdraw()
-	#file_path1 = filedialog.askopenfilename()
-	# note that tkinter.filedialog does not work. Need to have from tkinter import filedialog
-	#root1.filename =  filedialog.askopenfilenames(initialdir = os.getcwd(),title = "Select a log file or multiple log files",filetypes = (("log files","*.log"),("all files","*.*")))
 	root1.filename =  filedialog.askopenfilename(initialdir = os.getcwd(),title = "Select a log file",filetypes = (("log files","*.log"),("all files","*.*")))
 	return(root1.filename)
+	
+def get_filename2():
+	# Prompts user to select a log file via Windows Explorer browser
+	currdir = os.getcwd()
+	file_path1 = currdir+ '\\ptc_d.log'
+	if os.path.exists(file_path1):
+		return(currdir+ '\\ptc_d.log')
+	else:
+		return get_filename1()
 
 
 def detect_features1(filename1):
@@ -263,10 +276,9 @@ def detect_features1(filename1):
 			else:
 				temp1 = line1[ line1.find(')') + 1: ]
 				temp1 = temp1.replace('\t', ' ')
-				#print('temp1 = ', temp1)
 				temp1 = temp1.split()
 				features1.extend(temp1)
-				#print('temp1 = ', temp1)
+				
 	if found1 != 0:
 		if found1 == 2:
 			for item1 in temp1:
@@ -282,30 +294,30 @@ def select_features1(features1):
 	# Prompts user to select one or more feature to analyze
 	root1 = tkinter.Tk()
 	root1.title("Select one or more feature")
-	root1.geometry('320x200')
+	root1.geometry('600x400')
 	listbox1 = tkinter.Listbox(root1, width=40, height=10, selectmode='multiple')
 	listbox1.pack()
 	for item in features1:
-	    listbox1.insert('end', item)
+		listbox1.insert('end', item)
 	# Function for printing the
 	# selected listbox value(s)
 	def ok1():
-	    # Traverse the tuple returned by
-	    # curselection method and print
-	    # corresponding value(s) in the listbox
-	    # for i in listbox1.curselection():
-	    #     temp1.append(listbox1.get(i))
-	    #     print(listbox1.get(i))
-	    root1.quit()
-	    #root1.destroy()
-	    return
+		# Traverse the tuple returned by
+		# curselection method and print
+		# corresponding value(s) in the listbox
+		# for i in listbox1.curselection():
+		#     temp1.append(listbox1.get(i))
+		#     print(listbox1.get(i))
+		root1.quit()
+		#root1.destroy()
+		return
 
 	def on_closing1():
 		# when user clicks on X to close the windows, ask if want to quit
-	    if tkinter.messagebox.askokcancel("Quit", "Do you want to quit?"):
-	        root1.destroy()
-	        exit()
-	    return
+		if tkinter.messagebox.askokcancel("Quit", "Do you want to quit?"):
+			root1.destroy()
+			exit()
+		return
 	#show1 = tkinter.Label(root1, text = "Select one or more options", font = ("Helvtica", 10), padx = 10, pady = 10)
 	#show1.pack() 
 	button1 = tkinter.Button(root1, text="OK", command=ok1)
@@ -315,7 +327,7 @@ def select_features1(features1):
 	root1.mainloop()
 	temp1 = []
 	for i in listbox1.curselection():
-	    temp1.append(listbox1.get(i))
+		temp1.append(listbox1.get(i))
 	#     print(listbox1.get(i))
 	# print(temp1)
 	root1.quit()
@@ -379,11 +391,11 @@ def create_in_list1(list2):
 	# This in_list is used by the find_in_time1 function.
 	in_list2 = []
 	for line1 in list2:
-	    #if line1.find('(ptc_d) OUT: "') != -1 or line1.find('(ptc_d) IN: "') != -1:
-	    if line1[1].find(') IN: "') != -1:
-	        #list2 = [ line1, False ]
-	        #list1.append(list2)
-	        in_list2.append([line1[0],line1[1]])
+		#if line1.find('(ptc_d) OUT: "') != -1 or line1.find('(ptc_d) IN: "') != -1:
+		if line1[1].find(') IN: "') != -1:
+			#list2 = [ line1, False ]
+			#list1.append(list2)
+			in_list2.append([line1[0],line1[1]])
 	return in_list2
 
 # def find_in_time1(in_list1, feat1, user1):
@@ -495,10 +507,14 @@ def process_list1(list1, daemon1, features_sel1):
 	# daemon1 is not used for the time being
 	# features_sel1 is list containing all the license features selected by user for analysis
 	license_use1 = []
+	license_use_set = set()
 	#license_denied1 = []
 	#feature_use1 = []
 	denied_use1 = []
+	denied_use_set = set()
 	count1 = 0
+	count2 = 0
+	filename,extension = os.path.splitext(os.path.basename(filename1))
 	in_list1 = create_in_list1(list1)
 	for line1 in list1:
 		feature1 = line1[1][ line1[1].find('"')+1:line1[1].rfind('"')].strip()
@@ -516,24 +532,44 @@ def process_list1(list1, daemon1, features_sel1):
 						in_time1 =  list1[len(list1)-1][0] 
 					else:
 						in_time1 = line1[0] + timedelta(hours=24)
+				out_time1 = line1[0]
+				duration_hours = round((in_time1 - out_time1).seconds/3600.0, 2)
 				count1 += 1
-				templist1 = [ feature1, 
-				line1[0],
-				in_time1,
-				#int(line1[0].timestamp()), 
-				#int(in_time1.timestamp()), 
-				inactive1, user1,
-				line1[1], in_time_line1, filename1, 
-				count1
-				]
-				license_use1.append( templist1 )
+				templist1 = { 
+								"No.": count1,
+								"Date": out_time1.strftime("%Y-%m-%d"),
+								"Client": user1,
+								"Feature": feature1, 
+								"StartTime": out_time1.strftime("%Y-%m-%d %H:%M:%S"),
+								"EndTime": in_time1.strftime("%Y-%m-%d %H:%M:%S"),
+								"DurationHours": duration_hours,
+								"HostName": filename
+								#inactive1, 							  
+								#line1[1], 
+								#in_time_line1, 
+								#filename1, 							  
+							}
+				templist1_tuple = tuple(templist1.items())
+				if templist1_tuple not in license_use_set:
+					license_use_set.add(templist1_tuple)
+					license_use1.append( templist1 )
 				#print(templist1)
 			elif line1[1].find(') DENIED: "') != -1:
 				user1 = line1[1][line1[1].rfind('"')+2:line1[1].find(' ',line1[1].rfind('"')+2)].strip()    
 				errorno1 = line1[1][line1[1].rfind('(')+1:line1[1].rfind('))')]  
-				templist1 = [ feature1, int(line1[0].timestamp()), user1,
-				errorno1, line1[1], filename1]
-				denied_use1.append( templist1 )
+				templist1 = { 
+								"Client":user1,
+								"Feature":feature1, 
+								"ErrorDate":line1[0].strftime("%Y-%m-%d"), 
+								"ErrorTime":line1[0].strftime("%H:%M:%S"), 
+								#errorno1, 
+								"ErrorInfo":line1[1],
+								"HostName": filename
+							}
+				templist1_tuple = tuple(templist1.items())
+				if templist1_tuple not in denied_use_set:
+					denied_use_set.add(templist1_tuple)
+					denied_use1.append( templist1 )
 	return license_use1, denied_use1
 
 def sort1(sub1):
@@ -608,159 +644,75 @@ def usage_graph1(coord1, feature1):
 
 
 
+# 创建与数据库的连接
+db_filename = 'temp.db'
+connection = sqlite3.connect(db_filename)
+# 获取数据库中的表名  
+tables = pd.read_sql_query("SELECT name FROM sqlite_master WHERE type='table';", connection)
+
+# 清空每个表中的数据  
+if tables is not None and not tables.empty:
+	for table in tables['name']:
+		delete_query = f"DELETE FROM {table}" 
+		connection.execute(delete_query)
+connection.commit()
+
+filenamelist = []
+filenamelist = get_filenamelist()
+for filename1 in filenamelist:
+	features1 = []
+	features_sel1 = []
+	daemon1 = detect_daemon1(filename1)
+	if daemon1:
+		pass
+
+	tz1, dt_obj = detect_timezone_startdate1(filename1)
+	if tz1:
+		pass
 
 
+	list1 = create_datetime_list1(filename1)
+	
+	features1 = detect_features1(filename1)
+
+	for feature in features1:	
+		if feature.find('127') == -1 and feature.find('155') == -1 :
+			features_sel1.append(feature)
 
 
-def process_file1(filename1, daemon1, tz1, features_sel1):
-	# This is not being used now!
-	in_list1 = create_in_list1(filename1)
-	feature_use1 = []
+	license_use1 = []
 	denied_use1 = []
-	tz, dt_obj = detect_timezone_startdate1(filename1)
-	with open(filename1, 'r') as f1:
-		lines1 = f1.readlines()
-	hrprev1 = 0
-	for line1 in lines1:
-		if line1.find('-SLOG@) Start-Date:') != -1 or line1.find('-SLOG@) Time:') != -1:
-			if line1.find('-SLOG@) Start-Date:') != -1: 
-				currentdate1 = line1[ line1.find('-SLOG@) Start-Date:') + 23:]
-			elif line1.find('-SLOG@) Time:') != -1:
-				currentdate1 = line1[ line1.find('-SLOG@) Time:') + 18:]
-			if currentdate1.find(':') == -1:
-				print("error at line 300: currentdate1.find(':') == -1")
-			else:
-				currentdate1 = currentdate1[:currentdate1.find(':')-3].strip()
-			dt_obj = datetime.strptime(currentdate1 + ' 00:00:00', '%b %d %Y %H:%M:%S')
-			origin_tz = zoneinfo.ZoneInfo(tz1)
-			dt_obj = datetime( dt_obj.year, dt_obj.month, dt_obj.day, tzinfo=origin_tz)
-		elif line1.find(':') != -1 and line1.find('(') != -1:
-			t1 = line1[:line1.find('(')].strip().split(':')
-			hr1 = t1[0]
-			if hr1.isdigit():
-				hr1 = int(hr1)
-				if hr1 < 24:
-					if hr1 < hrprev1:
-						if dt_obj:
-							dt_obj = dt_obj + timedelta(hours=24)
-				hrprev1 = hr1
-		elif line1.find(') OUT: ') != -1:
-			feature1 = line1[ line1.find('"')+1:line1.rfind('"')].strip()
-			if feature1 in features_sel1:
-				time1 = line1[ 0:line1.find('(')-1]
-				if dt_obj:
-					t1 = time1.split(':')
-					out_datetime1 = dt_obj + timedelta(seconds=int(t1[2]), minutes=int(t1[1]), hours=int(t1[0]))
-					user1 = line1[line1.rfind('"')+2:].strip()
-					#in_time1, inactive1, in_time_line1 = find_in_time1(lines1[i-1:],feature1,user1,out_in_list1)
-					in_time1, inactive1, in_time_line1 = find_in_time1(in_list1,feature1,user1)
-					if in_time1 is None:
-						if (last_time1 - out_datetime1).total_seconds()/3600 < 24:  
-							in_datetime1 = last_time1
-						else:
-							in_datetime1 = out_datetime1 + timedelta(hours=24)
-					else:
-						t1 = in_time1.split(':')
-						in_datetime1 = dt_obj + timedelta(seconds=int(t1[2]), minutes=int(t1[1]), hours=int(t1[0]))
-						if in_datetime1 < out_datetime1:
-							in_datetime1 = dt_obj + timedelta(seconds=int(t1[2]), minutes=int(t1[1]), hours=int(t1[0])+24)
-						else:
-							in_datetime1 = dt_obj + timedelta(seconds=int(t1[2]), minutes=int(t1[1]), hours=int(t1[0]))
-
-				else:
-					print("Error: no currentdate1 dt_obj when we come to a OUT line")
-					pass
-		elif line1.find('(SW_D) DENIED: "') != -1:
-			pass
+	license_use1, denied_use1 = process_list1(list1, daemon1, features_sel1)
 
 
+	df = pd.DataFrame(license_use1)
+	df.to_sql('creo_usage', connection, if_exists='append', index=False)
 
+	df = pd.DataFrame(denied_use1)
+	df.to_sql('creo_denied', connection, if_exists='append', index=False)
 
+	
+connection.execute('CREATE TABLE IF NOT EXISTS creo_usage_daily (Date TEXT, Client TEXT, TotalHours REAL) ')
 
+connection.execute(' INSERT INTO creo_usage_daily 	SELECT  Date, Client, ROUND(sum(DurationHours)) AS TotalHours  FROM creo_usage  GROUP BY  Date, Client ')
 
+connection.commit()
 
-
-
-
-
-
-
-#filenames1 = []
-#filenames1 = get_filenames1()
-filename1 = get_filename1()
-# print(filename1)
-features1 = []
-#for filename1 in filenames1:
-# print(filename1)
-#exit()
-features_sel1 = []
-daemon1 = detect_daemon1(filename1)
-# print(daemon1)
-if daemon1:
-	pass
-	# print("Vendor daemon detected: ", daemon1)
-
-tz1, dt_obj = detect_timezone_startdate1(filename1)
-#print(tz1, dt_obj)
-if tz1:
-	pass
-	# print("Timezone: ", tz1)
-	# print(type(tz1))
-
-
-# tz1 = timezone_win_iana_mapping1('Pacific Standard Time')
-# print(tz1)
-# print("type(tz1)", type(tz1))
-# print("len(tz1", len(tz1))
-# print("len('Pacific Standard Time')",len('Pacific Standard Time'))
-# tz1 = timezone_win_iana_mapping1(tz1)
-# print(tz1)
-# tz1 = timezone_win_iana_mapping1('Pacific Daylight Time')
-# print(tz1)
-
-# print(detect_features1(filename1))
-features1 = detect_features1(filename1)
-
-while not features_sel1:
-	features_sel1 = select_features1(features1)
-# if not features_sel1:
-# 	features_sel1 = select_features1(features1)
-# print(features_sel1)
-
-# print(get_lastdate1(filename1,tz1))
-
-#line1 = '17:57:44 (ptc_d) IN: "PROE_EssentialsIIM" stan@MV121-Stan'
-#print(get_time_in_line1(line1))
-
-list1 = create_datetime_list1(filename1)
-
-#print(list1)
-# with open(filename1 + "out.txt", 'w') as f1:
-# 	for line1 in list1:
-# 		f1.write(line1[0].strftime('%m:%d:%Y %H:%M:%S %Z') + ', ' + line1[1])
-license_use1 = []
-denied_use1 = []
-license_use1, denied_use1 = process_list1(list1, daemon1, features_sel1)
-
-#print(feature_use1)
-# print(denied_use1)
-# print(len(denied_use1))
-# for line1 in feature_use1:
-# 	print(line1)
-
-# in_list1 = create_in_list1(list1)
-# print(len(in_list1))
-
+'''
 coord1 = []
 for feature1 in features_sel1:
-	# print(feature1)
+	#print(feature1)
 	coord1 = feature_use_coord1(license_use1,feature1)
-	# print(coord1)
+	#print(coord1)
 	if coord1:
 		usage_graph1(coord1, feature1)
 
+
 count1 = 0
 for line1 in license_use1:
-	if (line1[2] - line1[1]).total_seconds() / 3600 > 12:
+	if (line1[2] - line1[1]).total_seconds() / 3600 > 8:
 		count1 += 1
 print(count1)
+'''
+connection.close()
+exit()
